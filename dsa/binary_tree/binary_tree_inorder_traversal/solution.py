@@ -1,0 +1,22 @@
+from typing import Optional
+
+class TreeNode:
+    def __init__(self, val: int = 0, left: Optional['TreeNode'] = None, right: Optional['TreeNode'] = None):
+        self.val = val
+        self.left = left
+        self.right = right
+
+class Solution:
+    def inorderTraversal(self, root: Optional[TreeNode]) -> list[int]:
+        res: list[int] = []
+        stack: list[TreeNode] = []
+        cur = root
+        while stack or cur:
+            while cur:
+                stack.append(cur)
+                cur = cur.left
+            cur = stack.pop()
+            res.append(cur.val)
+            cur = cur.right
+        return res
+
