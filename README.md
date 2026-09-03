@@ -109,12 +109,5 @@ algo/
 - [max_pooling2d](ai/cv/max_pooling2d/README.md)
 - [roi_pooling](ai/cv/roi_pooling/README.md)
 
-## 进度清单
-
-| 分类 | 题数 | 状态 |
-| --- | ---: | --- |
-| DSA | 31 | ✅ 已完成 |
-| AI | 22 | ✅ 已完成 |
-| 合计 | 53 | ✅ 已完成 |
 
 > 覆盖传统数据结构与算法 11 个分类、AI/生成式与 CV 6 个分类。后续版本按分类继续扩展。

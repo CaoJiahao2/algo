@@ -1,29 +1,66 @@
+import math
 import torch
 import torch.nn as nn
 
+
 class MultiHeadAttention(nn.Module):
-    def __init__(self, d_model: int, num_heads: int):
+    def __init__(self, d_model, num_heads):
         super().__init__()
+
         assert d_model % num_heads == 0
+
         self.d_model = d_model
         self.num_heads = num_heads
-        self.d_k = d_model // num_heads
-        self.w_q = nn.Linear(d_model, d_model)
-        self.w_k = nn.Linear(d_model, d_model)
-        self.w_v = nn.Linear(d_model, d_model)
-        self.w_o = nn.Linear(d_model, d_model)
+        self.d_head = d_model // num_heads
 
-    def forward(self, query: torch.Tensor, key: torch.Tensor, value: torch.Tensor,
-                mask: torch.Tensor | None = None) -> torch.Tensor:
-        B, T, _ = query.shape
-        q = self.w_q(query).view(B, -1, self.num_heads, self.d_k).transpose(1, 2)
-        k = self.w_k(key).view(B, -1, self.num_heads, self.d_k).transpose(1, 2)
-        v = self.w_v(value).view(B, -1, self.num_heads, self.d_k).transpose(1, 2)
+        self.W_q = nn.Linear(d_model, d_model)
+        self.W_k = nn.Linear(d_model, d_model)
+        self.W_v = nn.Linear(d_model, d_model)
+        self.W_o = nn.Linear(d_model, d_model)
 
-        scores = torch.matmul(q, k.transpose(-2, -1)) / (self.d_k ** 0.5)
+    def forward(self, x, mask=None):
+        """
+        x: [B, L, D]
+        mask: broadcastable to [B, H, L, L]
+        """
+
+        B, L, _ = x.shape
+
+        # 1. linear projection
+        Q = self.W_q(x)  # [B, L, D]
+        K = self.W_k(x)
+        V = self.W_v(x)
+
+        # 2. split heads
+        # [B, L, D] -> [B, H, L, d]
+        Q = Q.view(B, L, self.num_heads, self.d_head).transpose(1, 2)
+        K = K.view(B, L, self.num_heads, self.d_head).transpose(1, 2)
+        V = V.view(B, L, self.num_heads, self.d_head).transpose(1, 2)
+
+        # 3. scaled dot-product attention
+        # [B, H, L, d] @ [B, H, d, L]
+        # -> [B, H, L, L]
+        scores = Q @ K.transpose(-2, -1)
+        scores = scores / math.sqrt(self.d_head)
+
+        # 4. mask
         if mask is not None:
-            scores = scores.masked_fill(mask == 0, float('-inf'))
-        attn = torch.softmax(scores, dim=-1)
-        out = torch.matmul(attn, v).transpose(1, 2).contiguous().view(B, T, self.d_model)
-        return self.w_o(out)
+            scores = scores.masked_fill(mask == 0, float("-inf"))
 
+        # 5. softmax
+        attn = torch.softmax(scores, dim=-1)
+
+        # 6. weighted sum
+        # [B, H, L, L] @ [B, H, L, d]
+        # -> [B, H, L, d]
+        out = attn @ V
+
+        # 7. concat heads
+        # [B, H, L, d] -> [B, L, H, d] -> [B, L, D]
+        out = out.transpose(1, 2).contiguous()
+        out = out.view(B, L, self.d_model)
+
+        # 8. output projection
+        out = self.W_o(out)
+
+        return out
